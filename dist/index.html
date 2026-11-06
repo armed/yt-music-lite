@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { --accent: #c0392b; }
+  * { box-sizing: border-box; margin: 0; user-select: none; -webkit-user-select: none; }
+  html, body { height: 100%; background: transparent; font-family: -apple-system, system-ui, sans-serif; color: #f2f2f2; overflow: hidden; }
+  .card { position: relative; height: 100%; border-radius: 16px; overflow: hidden; background: #121214; border: 1px solid rgba(255,255,255,.12); padding: 16px 18px 14px 26px; display: flex; flex-direction: column; gap: 12px; }
+  .bg { position: absolute; inset: -30px; background-size: cover; background-position: center; filter: blur(40px) saturate(1.2); opacity: .35; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,10,12,.45), rgba(10,10,12,.8)); }
+  .bar { position: absolute; left: 8px; top: 16px; bottom: 16px; width: 5px; border-radius: 3px; background: var(--accent); opacity: .85; }
+  .card > * { position: relative; }
+  .card > .bg, .card > .shade, .card > .bar { position: absolute; }
+  .top { display: flex; gap: 16px; align-items: center; }
+  .cover { width: 72px; height: 72px; border-radius: 12px; background: #222 center/cover; flex: none; }
+  .meta { min-width: 0; }
+  .title { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist { font-size: 14px; color: rgba(255,255,255,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+  .progress { display: flex; align-items: center; gap: 10px; font: 11px ui-monospace, Menlo, monospace; color: rgba(255,255,255,.45); }
+  .track { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); cursor: pointer; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--accent); transition: width .5s linear; }
+  .controls { align-self: center; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 22px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.1); }
+  button { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #eee; }
+  button:hover { background: rgba(255,255,255,.1); }
+  button.active { color: var(--accent); }
+  button.play { width: 46px; height: 46px; background: rgba(192,57,43,.35); color: #ff8a7d; }
+  svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  svg .f { fill: currentColor; stroke: none; }
+  .sep { width: 1px; height: 22px; background: rgba(255,255,255,.15); margin: 0 4px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="bg" id="bg"></div><div class="shade"></div><div class="bar"></div>
+  <div class="top">
+    <div class="cover" id="cover"></div>
+    <div class="meta"><div class="title" id="title">Nothing playing</div><div class="artist" id="artist"></div></div>
+  </div>
+  <div class="progress"><span id="pos">0:00</span><div class="track" id="track"><div class="fill" id="fill"></div></div><span id="dur">0:00</span></div>
+  <div class="controls">
+    <button id="like" title="Like"><svg viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1.2 2 3l-.6 3H19a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.9 20H7"/></svg></button>
+    <button id="prev" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5L9 12l10 7z"/></svg></button>
+    <button id="play" class="play" title="Play/Pause"><svg viewBox="0 0 24 24" id="playIcon"></svg></button>
+    <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+    <button id="dislike" title="Dislike"><svg viewBox="0 0 24 24" style="transform:scaleY(-1)"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1.2 2 3l-.6 3H19a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.9 20H7"/></svg></button>
+    <span class="sep"></span>
+    <button id="mute" title="Mute"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    <button id="open" title="Open window"><svg viewBox="0 0 24 24"><path d="M3 6h12M3 12h12M3 18h7M18 15v5M18 15l3-1M18 20a2 2 0 1 1-2-2"/></svg></button>
+  </div>
+</div>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const PLAY = '<path class="f" d="M7 4l13 8-13 8z"/>';
+  const PAUSE = '<path class="f" d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  let duration = 0;
+  $("playIcon").innerHTML = PLAY;
+
+  function render(s) {
+    if (!s || !s.title && !s.duration) return;
+    $("title").textContent = s.title || "Nothing playing";
+    $("artist").textContent = s.artist;
+    const img = s.cover ? `url("${s.cover}")` : "none";
+    $("cover").style.backgroundImage = img;
+    $("bg").style.backgroundImage = img;
+    $("playIcon").innerHTML = s.playing ? PAUSE : PLAY;
+    $("pos").textContent = fmt(s.position);
+    $("dur").textContent = fmt(s.duration);
+    $("fill").style.width = (s.duration ? (s.position / s.duration) * 100 : 0) + "%";
+    $("like").classList.toggle("active", s.likeStatus === "LIKE");
+    $("dislike").classList.toggle("active", s.likeStatus === "DISLIKE");
+    $("mute").classList.toggle("active", s.muted);
+    duration = s.duration;
+  }
+
+  const act = (action, value) => invoke("player_action", { action, value: value ?? null });
+  for (const [id, a] of [["like","like"],["prev","prev"],["play","playPause"],["next","next"],["dislike","dislike"],["mute","toggleMute"]])
+    $(id).onclick = () => act(a);
+  $("open").onclick = () => invoke("show_main");
+  $("track").onclick = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (duration) act("seek", (e.clientX - r.left) / r.width);
+  };
+
+  const refresh = () => invoke("get_state").then(render);
+  listen("player-state", (e) => render(e.payload));
+  window.addEventListener("focus", refresh);
+  refresh();
+</script>
+</body>
+</html>

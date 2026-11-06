@@ -1,0 +1,10 @@
+{
+  "identifier": "popup",
+  "windows": ["popup"],
+  "permissions": [
+    "core:default",
+    "allow-get-state",
+    "allow-player-action",
+    "allow-show-main"
+  ]
+}

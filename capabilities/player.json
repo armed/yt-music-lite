@@ -1,0 +1,7 @@
+{
+  "identifier": "player",
+  "windows": ["main"],
+  "local": false,
+  "remote": { "urls": ["https://music.youtube.com/*"] },
+  "permissions": ["allow-report-state", "allow-start-drag", "allow-toggle-maximize"]
+}
