@@ -46,8 +46,8 @@ Settings live in a JSON file that is created on first launch:
 
 | Platform | Path |
 |---|---|
-| macOS | `~/Library/Application Support/dev.armed.ytmusic-rust/settings.json` |
-| Linux | `~/.config/dev.armed.ytmusic-rust/settings.json` |
+| macOS | `~/Library/Application Support/dev.armed.ytm-lite/settings.json` |
+| Linux | `~/.config/dev.armed.ytm-lite/settings.json` |
 
 ```json
 {

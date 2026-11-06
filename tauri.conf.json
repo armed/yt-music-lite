@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "YT Music Lite",
   "version": "0.1.0",
-  "identifier": "dev.armed.ytmusic-rust",
+  "identifier": "dev.armed.ytm-lite",
   "build": { "frontendDist": "./dist" },
   "app": {
     "withGlobalTauri": true,

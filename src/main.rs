@@ -25,7 +25,7 @@ const YTM_URL: &str = "https://music.youtube.com";
 const SAFARI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 \
 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 #[cfg(target_os = "macos")]
-const DATA_STORE_ID: [u8; 16] = *b"ytmusic-rust-ws1";
+const DATA_STORE_ID: [u8; 16] = *b"ytm-lite-store01";
 const POPUP_SIZE: (f64, f64) = (420.0, 200.0);
 const POPUP_GAP: f64 = 6.0;
 const BLUR_TOGGLE_GUARD: Duration = Duration::from_millis(250);
@@ -42,7 +42,7 @@ const ACTIONS: &[&str] = &[
 
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
 const COLD_START_FLAG: &str = "--cold-start";
-const IDENTIFIER: &str = "dev.armed.ytmusic-rust";
+const IDENTIFIER: &str = "dev.armed.ytm-lite";
 
 #[cfg(unix)]
 fn control_socket_path() -> Option<std::path::PathBuf> {
