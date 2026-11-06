@@ -1,0 +1,11 @@
+{
+  "identifier": "settings",
+  "windows": ["settings"],
+  "permissions": [
+    "core:default",
+    "allow-get-settings",
+    "allow-set-start-hidden",
+    "allow-set-shortcut",
+    "allow-reveal-settings-file"
+  ]
+}

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 use tauri::{
     image::Image,
-    menu::{CheckMenuItem, MenuBuilder, MenuItem, SubmenuBuilder},
+    menu::{MenuBuilder, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     ActivationPolicy, AppHandle, Emitter, Manager, Rect, WebviewUrl, WebviewWindowBuilder,
     WindowEvent,
@@ -18,7 +18,7 @@ use tauri::TitleBarStyle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_window_state::StateFlags;
 
-use settings::Settings;
+use settings::{Settings, Shortcuts};
 
 const YTM_URL: &str = "https://music.youtube.com";
 #[cfg(target_os = "macos")]
@@ -28,6 +28,7 @@ const SAFARI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWe
 const DATA_STORE_ID: [u8; 16] = *b"ytm-lite-store01";
 const POPUP_SIZE: (f64, f64) = (480.0, 200.0);
 const POPUP_GAP: f64 = 6.0;
+const SETTINGS_SIZE: (f64, f64) = (460.0, 330.0);
 const BLUR_TOGGLE_GUARD: Duration = Duration::from_millis(250);
 const ACTIONS: &[&str] = &[
     "play",
@@ -149,6 +150,47 @@ fn get_state(app: AppHandle) -> Value {
 #[tauri::command]
 fn player_action(app: AppHandle, action: String, value: Option<f64>) {
     run_action(&app, &action, value);
+}
+
+#[tauri::command]
+fn get_settings(app: AppHandle) -> Settings {
+    app.state::<AppState>().settings.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn set_start_hidden(app: AppHandle, value: bool) {
+    let state = app.state::<AppState>();
+    let mut settings = state.settings.lock().unwrap();
+    settings.start_hidden = value;
+    settings.save(&app);
+}
+
+#[tauri::command]
+fn set_shortcut(app: AppHandle, name: String, accelerator: String) -> Result<(), String> {
+    let name = Shortcuts::NAMES
+        .iter()
+        .copied()
+        .find(|known| *known == name)
+        .ok_or("unknown shortcut")?;
+    let state = app.state::<AppState>();
+    let mut settings = state.settings.lock().unwrap();
+    let old = settings.shortcuts.get(name).unwrap_or_default().to_string();
+    if old == accelerator {
+        return Ok(());
+    }
+    let _ = app.global_shortcut().unregister(old.as_str());
+    if let Err(err) = bind_shortcut(&app, name, &accelerator) {
+        let _ = bind_shortcut(&app, name, &old);
+        return Err(err);
+    }
+    settings.shortcuts.set(name, accelerator);
+    settings.save(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn reveal_settings_file(app: AppHandle) {
+    settings::reveal(&app);
 }
 
 #[tauri::command]
@@ -320,29 +362,32 @@ fn build_popup_window(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let start_hidden = app.state::<AppState>().settings.lock().unwrap().start_hidden;
-    let start_hidden_item = CheckMenuItem::with_id(
-        app,
-        "start_hidden",
-        "Start hidden in tray",
-        true,
-        start_hidden,
-        None::<&str>,
-    )?;
-    let settings_menu = SubmenuBuilder::new(app, "Settings")
-        .item(&start_hidden_item)
-        .item(&MenuItem::with_id(
-            app,
-            "open_settings_file",
-            "Open settings file…",
-            true,
-            None::<&str>,
-        )?)
+fn build_settings_window(app: &tauri::App) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+        .title("YT Music Lite Settings")
+        .inner_size(SETTINGS_SIZE.0, SETTINGS_SIZE.1)
+        .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
+        .center()
+        .visible(false)
         .build()?;
+    Ok(())
+}
+
+fn open_settings(app: &AppHandle) {
+    hide_popup(app);
+    let Some(window) = app.get_webview_window("settings") else {
+        return;
+    };
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
         .item(&MenuItem::with_id(app, "open", "Open YT Music", true, None::<&str>)?)
-        .item(&settings_menu)
+        .item(&MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?)
         .separator()
         .item(&MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?)
         .build()?;
@@ -355,14 +400,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "open" => open_main(app),
             "quit" => app.exit(0),
-            "start_hidden" => {
-                let value = start_hidden_item.is_checked().unwrap_or(true);
-                let state = app.state::<AppState>();
-                let mut settings = state.settings.lock().unwrap();
-                settings.start_hidden = value;
-                settings.save(app);
-            }
-            "open_settings_file" => settings::reveal(app),
+            "settings" => open_settings(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -419,35 +457,29 @@ fn spawn_loading_indicator(app: AppHandle) {
     });
 }
 
+fn bind_shortcut(app: &AppHandle, name: &'static str, accelerator: &str) -> Result<(), String> {
+    app.global_shortcut()
+        .on_shortcut(accelerator, move |app, _, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            match name {
+                "play_pause" => run_action(app, "playPause", None),
+                "next" => run_action(app, "next", None),
+                "prev" => run_action(app, "prev", None),
+                "toggle_popup" => toggle_popup(app, None),
+                _ => {}
+            }
+        })
+        .map_err(|err| err.to_string())
+}
+
 fn register_shortcuts(app: &AppHandle, settings: &Settings) {
-    let bindings = [
-        (&settings.shortcuts.play_pause, "playPause"),
-        (&settings.shortcuts.next, "next"),
-        (&settings.shortcuts.prev, "prev"),
-    ];
-    for (accelerator, action) in bindings {
-        let result = app
-            .global_shortcut()
-            .on_shortcut(accelerator.as_str(), move |app, _, event| {
-                if event.state == ShortcutState::Pressed {
-                    run_action(app, action, None);
-                }
-            });
-        if let Err(err) = result {
+    for &name in Shortcuts::NAMES {
+        let accelerator = settings.shortcuts.get(name).unwrap_or_default();
+        if let Err(err) = bind_shortcut(app, name, accelerator) {
             eprintln!("cannot register shortcut {accelerator:?}: {err}");
         }
-    }
-
-    let accelerator = &settings.shortcuts.toggle_popup;
-    let result = app
-        .global_shortcut()
-        .on_shortcut(accelerator.as_str(), |app, _, event| {
-            if event.state == ShortcutState::Pressed {
-                toggle_popup(app, None);
-            }
-        });
-    if let Err(err) = result {
-        eprintln!("cannot register shortcut {accelerator:?}: {err}");
     }
 }
 
@@ -493,7 +525,7 @@ fn main() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
-                .with_denylist(&["popup"])
+                .with_denylist(&["popup", "settings"])
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
@@ -501,6 +533,10 @@ fn main() {
             get_state,
             player_action,
             show_main,
+            get_settings,
+            set_start_hidden,
+            set_shortcut,
+            reveal_settings_file,
             start_drag,
             toggle_maximize
         ])
@@ -508,6 +544,10 @@ fn main() {
             ("main", WindowEvent::CloseRequested { api, .. }) => {
                 api.prevent_close();
                 hide_main(window.app_handle());
+            }
+            ("settings", WindowEvent::CloseRequested { api, .. }) => {
+                api.prevent_close();
+                let _ = window.hide();
             }
             ("popup", WindowEvent::Focused(false)) => {
                 let app = window.app_handle();
@@ -542,6 +582,7 @@ fn main() {
 
             build_main_window(app)?;
             build_popup_window(app)?;
+            build_settings_window(app)?;
             build_tray(app)?;
             spawn_loading_indicator(app.handle().clone());
 

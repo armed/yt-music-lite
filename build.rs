@@ -4,6 +4,10 @@ fn main() {
         "get_state",
         "player_action",
         "show_main",
+        "get_settings",
+        "set_start_hidden",
+        "set_shortcut",
+        "reveal_settings_file",
         "start_drag",
         "toggle_maximize",
     ]);

@@ -10,6 +10,7 @@ Developed and tested on macOS only.
 - Starts hidden in the tray; closing the window hides it instead of quitting.
 - Tray popup (left click) with cover, title, artist, seek bar and playback controls.
 - Tray menu (right click): open the window, settings, quit.
+- Settings window for start-in-tray and the global shortcuts.
 - Global hotkeys for play/pause, next, previous and showing/hiding the popup.
 - Playback commands from the command line.
 
@@ -43,8 +44,7 @@ Sign in to your Google account once from the main window.
 }
 ```
 
-Shortcuts use the [accelerator syntax](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/struct.HotKey.html)
-and are read at startup.
+The settings window edits this file; shortcuts apply immediately. They use the [accelerator syntax](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/struct.HotKey.html).
 
 ## Command line
 

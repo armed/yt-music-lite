@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { --accent: #c0392b; }
+  * { box-sizing: border-box; margin: 0; user-select: none; -webkit-user-select: none; }
+  html, body { height: 100%; background: #121214; font: 13px -apple-system, system-ui, sans-serif; color: #f2f2f2; }
+  body { padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+  h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 34px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .row:last-child { border-bottom: 0; }
+  .hint { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+  .key { all: unset; cursor: pointer; min-width: 170px; padding: 5px 10px; text-align: center; border-radius: 8px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); font: 12px ui-monospace, Menlo, monospace; }
+  .key:hover { background: rgba(255,255,255,.12); }
+  .key.recording { border-color: var(--accent); color: #ff8a7d; }
+  .key.error { border-color: #e74c3c; }
+  .switch { all: unset; cursor: pointer; width: 38px; height: 22px; border-radius: 11px; background: rgba(255,255,255,.18); position: relative; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { transform: translateX(16px); }
+  .error-text { color: #ff8a7d; font-size: 11px; min-height: 14px; }
+  a { color: rgba(255,255,255,.5); cursor: pointer; font-size: 11px; text-decoration: underline; }
+  footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<section>
+  <h2>General</h2>
+  <div class="row">
+    <div>Start hidden in tray</div>
+    <button class="switch" id="startHidden"></button>
+  </div>
+</section>
+<section>
+  <h2>Global shortcuts</h2>
+  <div class="row"><div>Play / pause</div><button class="key" data-name="play_pause"></button></div>
+  <div class="row"><div>Next track</div><button class="key" data-name="next"></button></div>
+  <div class="row"><div>Previous track</div><button class="key" data-name="prev"></button></div>
+  <div class="row"><div>Show / hide mini player</div><button class="key" data-name="toggle_popup"></button></div>
+</section>
+<footer>
+  <span class="error-text" id="error"></span>
+  <a id="file">Open settings file</a>
+</footer>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const $ = (s) => document.querySelector(s);
+  const errorEl = $("#error");
+  const keys = [...document.querySelectorAll(".key")];
+  let recording = null;
+
+  const show = (btn, text) => { btn.textContent = text; };
+
+  async function load() {
+    const s = await invoke("get_settings");
+    $("#startHidden").classList.toggle("on", s.start_hidden);
+    for (const k of keys) show(k, s.shortcuts[k.dataset.name]);
+  }
+
+  $("#startHidden").onclick = (e) => {
+    const on = !e.currentTarget.classList.contains("on");
+    e.currentTarget.classList.toggle("on", on);
+    invoke("set_start_hidden", { value: on });
+  };
+  $("#file").onclick = () => invoke("reveal_settings_file");
+
+  const keyName = (code) => {
+    let m;
+    if ((m = code.match(/^Key([A-Z])$/))) return m[1];
+    if ((m = code.match(/^Digit(\d)$/))) return m[1];
+    if ((m = code.match(/^Arrow(\w+)$/))) return m[1];
+    return code;
+  };
+
+  const stop = (btn) => {
+    btn.classList.remove("recording");
+    recording = null;
+    load();
+  };
+
+  for (const btn of keys) {
+    btn.onclick = () => {
+      errorEl.textContent = "";
+      btn.classList.remove("error");
+      recording = btn;
+      btn.classList.add("recording");
+      show(btn, "Press shortcut…");
+    };
+    btn.onblur = () => recording === btn && stop(btn);
+  }
+
+  window.addEventListener("keydown", async (e) => {
+    if (!recording) return;
+    e.preventDefault();
+    const btn = recording;
+    if (e.code === "Escape") return stop(btn);
+    if (/^(Meta|Control|Alt|Shift)/.test(e.code)) return;
+    const mods = [];
+    if (e.metaKey) mods.push("Cmd");
+    if (e.ctrlKey) mods.push("Ctrl");
+    if (e.altKey) mods.push("Alt");
+    if (e.shiftKey) mods.push("Shift");
+    if (!mods.length) {
+      errorEl.textContent = "Add at least one modifier key";
+      return;
+    }
+    const accelerator = [...mods, keyName(e.code)].join("+");
+    try {
+      await invoke("set_shortcut", { name: btn.dataset.name, accelerator });
+      errorEl.textContent = "";
+    } catch (err) {
+      errorEl.textContent = `${accelerator}: ${err}`;
+      btn.classList.add("error");
+    }
+    stop(btn);
+  });
+
+  window.addEventListener("focus", load);
+  load();
+</script>
+</body>
+</html>
