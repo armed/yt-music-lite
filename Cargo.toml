@@ -1,5 +1,5 @@
 [package]
-name = "ytmusic-rust"
+name = "ytm-lite"
 version = "0.1.0"
 edition = "2024"
 

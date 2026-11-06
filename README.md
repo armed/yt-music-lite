@@ -70,9 +70,9 @@ and are read at startup, so restart the app after editing them. The tray menu ha
 The binary accepts playback flags, which makes it scriptable from other tools:
 
 ```sh
-ytmusic-rust --play-pause
-ytmusic-rust --next
-ytmusic-rust --prev
+ytm-lite --play-pause
+ytm-lite --next
+ytm-lite --prev
 ```
 
 If the app is already running, the command is sent to it over a local Unix socket
