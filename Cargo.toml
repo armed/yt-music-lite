@@ -13,3 +13,10 @@ tauri-plugin-window-state = "2.5.0"
 
 [build-dependencies]
 tauri-build = { version = "2.7.4", features = [] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
