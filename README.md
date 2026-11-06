@@ -49,9 +49,9 @@ The settings window edits this file; shortcuts apply immediately. They use the [
 ## Command line
 
 ```sh
-ytm-lite --play-pause
-ytm-lite --next
-ytm-lite --prev
+ytm-lite play-pause
+ytm-lite next
+ytm-lite prev
 ```
 
 Enable "Command line tool" in the settings window to link `ytm-lite` into `~/.local/bin`

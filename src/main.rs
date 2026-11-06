@@ -46,14 +46,16 @@ const ACTIONS: &[&str] = &[
 
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("YTM_GIT_SHA"));
 const HELP: &str = "\
-Usage: ytm-lite [OPTION]
+Usage: ytm-lite [COMMAND | OPTION]
 
-Without options, starts the app (or does nothing if it is already running).
+Without arguments, starts the app (or does nothing if it is already running).
+
+Commands:
+  play-pause        Toggle playback
+  next              Skip to the next track
+  prev              Go to the previous track
 
 Options:
-      --play-pause  Toggle playback
-      --next        Skip to the next track
-      --prev        Go to the previous track
   -h, --help        Print this help
   -V, --version     Print the version
 
@@ -135,9 +137,9 @@ struct AppState {
 
 fn action_from_args(args: &[String]) -> Option<&'static str> {
     args.iter().find_map(|arg| match arg.as_str() {
-        "--play-pause" => Some("playPause"),
-        "--next" => Some("next"),
-        "--prev" => Some("prev"),
+        "play-pause" => Some("playPause"),
+        "next" => Some("next"),
+        "prev" => Some("prev"),
         _ => None,
     })
 }
