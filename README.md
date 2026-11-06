@@ -10,7 +10,7 @@ Developed and tested on macOS only.
 - Starts hidden in the tray; closing the window hides it instead of quitting.
 - Tray popup (left click) with cover, title, artist, seek bar and playback controls.
 - Tray menu (right click): open the window, settings, quit.
-- Global hotkeys for play/pause, next and previous.
+- Global hotkeys for play/pause, next, previous and showing/hiding the popup.
 - Playback commands from the command line.
 
 ## Build
@@ -37,7 +37,8 @@ Sign in to your Google account once from the main window.
   "shortcuts": {
     "play_pause": "CmdOrCtrl+Alt+P",
     "next": "CmdOrCtrl+Alt+Right",
-    "prev": "CmdOrCtrl+Alt+Left"
+    "prev": "CmdOrCtrl+Alt+Left",
+    "toggle_popup": "CmdOrCtrl+Alt+M"
   }
 }
 ```

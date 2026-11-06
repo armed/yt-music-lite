@@ -9,6 +9,7 @@ pub struct Shortcuts {
     pub play_pause: String,
     pub next: String,
     pub prev: String,
+    pub toggle_popup: String,
 }
 
 impl Default for Shortcuts {
@@ -17,6 +18,7 @@ impl Default for Shortcuts {
             play_pause: "CmdOrCtrl+Alt+P".into(),
             next: "CmdOrCtrl+Alt+Right".into(),
             prev: "CmdOrCtrl+Alt+Left".into(),
+            toggle_popup: "CmdOrCtrl+Alt+M".into(),
         }
     }
 }

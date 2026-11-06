@@ -110,6 +110,7 @@ struct AppState {
     player: Mutex<Value>,
     settings: Mutex<Settings>,
     popup_hidden_at: Mutex<Option<Instant>>,
+    tray_rect: Mutex<Option<Rect>>,
     pending_action: Mutex<Option<&'static str>>,
     track_seen: AtomicBool,
 }
@@ -221,9 +222,17 @@ fn hide_popup(app: &AppHandle) {
     }
 }
 
-fn toggle_popup(app: &AppHandle, tray_rect: Rect) {
+fn toggle_popup(app: &AppHandle, tray_rect: Option<Rect>) {
     let Some(popup) = app.get_webview_window("popup") else {
         return;
+    };
+    let state = app.state::<AppState>();
+    let tray_rect = match tray_rect {
+        Some(rect) => {
+            *state.tray_rect.lock().unwrap() = Some(rect.clone());
+            Some(rect)
+        }
+        None => state.tray_rect.lock().unwrap().clone(),
     };
     if popup.is_visible().unwrap_or(false) {
         let _ = popup.hide();
@@ -240,9 +249,26 @@ fn toggle_popup(app: &AppHandle, tray_rect: Rect) {
     }
 
     let scale = popup.scale_factor().unwrap_or(1.0);
-    let pos = tray_rect.position.to_physical::<f64>(scale);
-    let size = tray_rect.size.to_physical::<f64>(scale);
     let width = POPUP_SIZE.0 * scale;
+    // Before the tray icon has ever been clicked its position is unknown, so
+    // fall back to the top-right corner under the menu bar.
+    let (pos, size) = match tray_rect {
+        Some(rect) => (
+            rect.position.to_physical::<f64>(scale),
+            rect.size.to_physical::<f64>(scale),
+        ),
+        None => {
+            let Ok(Some(monitor)) = app.primary_monitor() else {
+                return;
+            };
+            let origin = monitor.position();
+            let right = origin.x as f64 + monitor.size().width as f64;
+            (
+                tauri::PhysicalPosition::new(right - width / 2.0 - 16.0 * scale, origin.y as f64),
+                tauri::PhysicalSize::new(0.0, 24.0 * scale),
+            )
+        }
+    };
     let mut x = pos.x + size.width / 2.0 - width / 2.0;
     let y = pos.y + size.height + POPUP_GAP * scale;
 
@@ -347,7 +373,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 ..
             } = event
             {
-                toggle_popup(tray.app_handle(), rect);
+                toggle_popup(tray.app_handle(), Some(rect));
             }
         })
         .build(app)?;
@@ -410,6 +436,18 @@ fn register_shortcuts(app: &AppHandle, settings: &Settings) {
         if let Err(err) = result {
             eprintln!("cannot register shortcut {accelerator:?}: {err}");
         }
+    }
+
+    let accelerator = &settings.shortcuts.toggle_popup;
+    let result = app
+        .global_shortcut()
+        .on_shortcut(accelerator.as_str(), |app, _, event| {
+            if event.state == ShortcutState::Pressed {
+                toggle_popup(app, None);
+            }
+        });
+    if let Err(err) = result {
+        eprintln!("cannot register shortcut {accelerator:?}: {err}");
     }
 }
 
@@ -486,6 +524,7 @@ fn main() {
                 player: Mutex::new(Value::Null),
                 settings: Mutex::new(settings),
                 popup_hidden_at: Mutex::new(None),
+                tray_rect: Mutex::new(None),
                 pending_action: Mutex::new(action_from_args(
                     &std::env::args().collect::<Vec<_>>(),
                 )),
