@@ -26,7 +26,7 @@ const SAFARI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWe
 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 #[cfg(target_os = "macos")]
 const DATA_STORE_ID: [u8; 16] = *b"ytm-lite-store01";
-const POPUP_SIZE: (f64, f64) = (420.0, 200.0);
+const POPUP_SIZE: (f64, f64) = (480.0, 200.0);
 const POPUP_GAP: f64 = 6.0;
 const BLUR_TOGGLE_GUARD: Duration = Duration::from_millis(250);
 const ACTIONS: &[&str] = &[
@@ -37,6 +37,8 @@ const ACTIONS: &[&str] = &[
     "like",
     "dislike",
     "toggleMute",
+    "toggleShuffle",
+    "toggleRepeat",
     "seek",
 ];
 

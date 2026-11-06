@@ -55,6 +55,14 @@
     }
   };
 
+  const queueState = () => {
+    try {
+      return $("ytmusic-player-queue").queue.store.store.getState().queue;
+    } catch {
+      return {};
+    }
+  };
+
   window.__ytm = {
     play: () => {
       if (video()?.paused) click("ytmusic-player-bar #play-pause-button");
@@ -72,6 +80,8 @@
         "ytmusic-player-bar #like-button-renderer #button-shape-dislike button",
         "ytmusic-player-bar #like-button-renderer .dislike",
       ),
+    toggleShuffle: () => click("ytmusic-player-bar .shuffle"),
+    toggleRepeat: () => click("ytmusic-player-bar .repeat"),
     toggleMute: () => {
       const v = video();
       if (v) v.muted = !v.muted;
@@ -95,6 +105,8 @@
       position: v?.currentTime ?? 0,
       duration: Number.isFinite(v?.duration) ? v.duration : 0,
       muted: !!v?.muted,
+      shuffle: !!queueState().shuffleEnabled,
+      repeat: queueState().repeatMode ?? "NONE",
       likeStatus:
         $("ytmusic-player-bar ytmusic-like-button-renderer")?.getAttribute("like-status") ??
         "INDIFFERENT",

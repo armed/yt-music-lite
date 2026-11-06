@@ -40,9 +40,11 @@
   <div class="progress"><span id="pos">0:00</span><div class="track" id="track"><div class="fill" id="fill"></div></div><span id="dur">0:00</span></div>
   <div class="controls">
     <button id="like" title="Like"><svg viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1.2 2 3l-.6 3H19a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.9 20H7"/></svg></button>
+    <button id="shuffle" title="Shuffle"><svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
     <button id="prev" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5L9 12l10 7z"/></svg></button>
     <button id="play" class="play" title="Play/Pause"><svg viewBox="0 0 24 24" id="playIcon"></svg></button>
     <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+    <button id="repeat" title="Repeat"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3"/><path id="repeatOne" d="M11 10h1v4" style="display:none"/></svg></button>
     <button id="dislike" title="Dislike"><svg viewBox="0 0 24 24" style="transform:scaleY(-1)"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1.2 2 3l-.6 3H19a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.9 20H7"/></svg></button>
     <span class="sep"></span>
     <button id="mute" title="Mute"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
@@ -73,11 +75,14 @@
     $("like").classList.toggle("active", s.likeStatus === "LIKE");
     $("dislike").classList.toggle("active", s.likeStatus === "DISLIKE");
     $("mute").classList.toggle("active", s.muted);
+    $("shuffle").classList.toggle("active", !!s.shuffle);
+    $("repeat").classList.toggle("active", !!s.repeat && s.repeat !== "NONE");
+    $("repeatOne").style.display = s.repeat === "ONE" ? "" : "none";
     duration = s.duration;
   }
 
   const act = (action, value) => invoke("player_action", { action, value: value ?? null });
-  for (const [id, a] of [["like","like"],["prev","prev"],["play","playPause"],["next","next"],["dislike","dislike"],["mute","toggleMute"]])
+  for (const [id, a] of [["like","like"],["prev","prev"],["play","playPause"],["next","next"],["dislike","dislike"],["mute","toggleMute"],["shuffle","toggleShuffle"],["repeat","toggleRepeat"]])
     $(id).onclick = () => act(a);
   $("open").onclick = () => invoke("show_main");
   $("track").onclick = (e) => {
