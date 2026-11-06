@@ -185,13 +185,24 @@ fn run_action(app: &AppHandle, action: &str, value: Option<f64>) {
 
 fn open_main(app: &AppHandle) {
     hide_popup(app);
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+    // The window stays on the Space it was last shown on, so without this the
+    // Dock click would jump back to that Space instead of opening here.
     #[cfg(target_os = "macos")]
-    let _ = app.set_activation_policy(ActivationPolicy::Regular);
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.show();
-        let _ = main.unminimize();
-        let _ = main.set_focus();
+    {
+        let _ = main.set_visible_on_all_workspaces(true);
+        let _ = app.set_activation_policy(ActivationPolicy::Regular);
     }
+    let _ = main.show();
+    let _ = main.unminimize();
+    let _ = main.set_focus();
+    #[cfg(target_os = "macos")]
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        let _ = main.set_visible_on_all_workspaces(false);
+    });
 }
 
 fn hide_main(app: &AppHandle) {
