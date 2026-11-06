@@ -20,6 +20,7 @@
   .switch.on { background: var(--accent); }
   .switch.on::after { transform: translateX(16px); }
   .error-text { color: #ff8a7d; font-size: 11px; min-height: 14px; }
+  code { font: 11px ui-monospace, Menlo, monospace; }
   a { color: rgba(255,255,255,.5); cursor: pointer; font-size: 11px; text-decoration: underline; }
   footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
 </style>
@@ -30,6 +31,13 @@
   <div class="row">
     <div>Start hidden in tray</div>
     <button class="switch" id="startHidden"></button>
+  </div>
+  <div class="row">
+    <div>
+      <div>Command line tool</div>
+      <div class="hint">Links <code>ytm-lite</code> into ~/.local/bin</div>
+    </div>
+    <button class="switch" id="cli"></button>
   </div>
 </section>
 <section>
@@ -55,6 +63,7 @@
   async function load() {
     const s = await invoke("get_settings");
     $("#startHidden").classList.toggle("on", s.start_hidden);
+    $("#cli").classList.toggle("on", await invoke("get_cli_installed"));
     for (const k of keys) show(k, s.shortcuts[k.dataset.name]);
   }
 
@@ -62,6 +71,17 @@
     const on = !e.currentTarget.classList.contains("on");
     e.currentTarget.classList.toggle("on", on);
     invoke("set_start_hidden", { value: on });
+  };
+  $("#cli").onclick = async (e) => {
+    const btn = e.currentTarget;
+    const on = !btn.classList.contains("on");
+    errorEl.textContent = "";
+    try {
+      await invoke("set_cli_installed", { value: on });
+    } catch (err) {
+      errorEl.textContent = String(err);
+    }
+    load();
   };
   $("#file").onclick = () => invoke("reveal_settings_file");
 

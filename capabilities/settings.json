@@ -6,6 +6,8 @@
     "allow-get-settings",
     "allow-set-start-hidden",
     "allow-set-shortcut",
-    "allow-reveal-settings-file"
+    "allow-reveal-settings-file",
+    "allow-get-cli-installed",
+    "allow-set-cli-installed"
   ]
 }

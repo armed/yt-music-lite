@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli;
 mod settings;
 
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
@@ -42,6 +43,22 @@ const ACTIONS: &[&str] = &[
     "toggleRepeat",
     "seek",
 ];
+
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("YTM_GIT_SHA"));
+const HELP: &str = "\
+Usage: ytm-lite [OPTION]
+
+Without options, starts the app (or does nothing if it is already running).
+
+Options:
+      --play-pause  Toggle playback
+      --next        Skip to the next track
+      --prev        Go to the previous track
+  -h, --help        Print this help
+  -V, --version     Print the version
+
+If the app is running, the command is sent to it. Otherwise the app is started
+and the action is applied once a track has loaded.";
 
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
 const COLD_START_FLAG: &str = "--cold-start";
@@ -186,6 +203,16 @@ fn set_shortcut(app: AppHandle, name: String, accelerator: String) -> Result<(),
     settings.shortcuts.set(name, accelerator);
     settings.save(&app);
     Ok(())
+}
+
+#[tauri::command]
+fn get_cli_installed() -> bool {
+    cli::is_installed()
+}
+
+#[tauri::command]
+fn set_cli_installed(value: bool) -> Result<(), String> {
+    if value { cli::install() } else { cli::uninstall() }
 }
 
 #[tauri::command]
@@ -485,7 +512,7 @@ fn register_shortcuts(app: &AppHandle, settings: &Settings) {
 
 #[cfg(target_os = "macos")]
 fn launch_via_launch_services(flag: &str) -> bool {
-    let Ok(exe) = std::env::current_exe() else {
+    let Ok(exe) = std::env::current_exe().and_then(std::fs::canonicalize) else {
         return false;
     };
     let Some(bundle) = exe.ancestors().nth(3) else {
@@ -503,6 +530,20 @@ fn launch_via_launch_services(flag: &str) -> bool {
 }
 
 fn main() {
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "-h" | "--help" => {
+                println!("ytm-lite {VERSION}\n\n{HELP}");
+                return;
+            }
+            "-V" | "--version" => {
+                println!("ytm-lite {VERSION}");
+                return;
+            }
+            _ => {}
+        }
+    }
+
     #[cfg(unix)]
     if std::env::args().all(|a| a != COLD_START_FLAG)
         && let Some(flag) = std::env::args().skip(1).find(|a| action_from_args(std::slice::from_ref(a)).is_some()) {
@@ -537,6 +578,8 @@ fn main() {
             set_start_hidden,
             set_shortcut,
             reveal_settings_file,
+            get_cli_installed,
+            set_cli_installed,
             start_drag,
             toggle_maximize
         ])

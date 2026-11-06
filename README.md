@@ -54,5 +54,6 @@ ytm-lite --next
 ytm-lite --prev
 ```
 
-If the app is running, the command is sent to it and the process exits immediately. Otherwise the
+Enable "Command line tool" in the settings window to link `ytm-lite` into `~/.local/bin`
+(make sure it is on your `PATH`). If the app is running, the command is sent to it and the process exits immediately. Otherwise the
 app is started and the action is applied once a track has loaded.
