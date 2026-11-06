@@ -18,7 +18,7 @@ Developed and tested on macOS. Windows and Linux are not tested.
 - macOS: overlay title bar, drag the window by any empty area, no text selection outside inputs,
   hidden scrollbars.
 
-## Install
+## Build and install
 
 Requirements: Rust toolchain and [`tauri-cli`](https://tauri.app/reference/cli/).
 
@@ -27,7 +27,9 @@ cargo install tauri-cli --locked
 cargo tauri build --bundles app
 ```
 
-The bundle is written to `target/release/bundle/macos/YT Music Lite.app`; copy it to `/Applications`.
+The bundle is written to `target/release/bundle/macos/YT Music Lite.app` (about 4 MB); copy it to
+`/Applications`. The release profile is tuned for size (`opt-level = "z"`, LTO, stripped), so a
+release build takes a while.
 
 For development:
 
