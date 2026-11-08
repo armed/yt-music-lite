@@ -6,20 +6,14 @@ use tauri::{AppHandle, Manager};
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Shortcuts {
-    pub play_pause: String,
-    pub next: String,
-    pub prev: String,
     pub toggle_popup: String,
 }
 
 impl Shortcuts {
-    pub const NAMES: &[&str] = &["play_pause", "next", "prev", "toggle_popup"];
+    pub const NAMES: &[&str] = &["toggle_popup"];
 
     pub fn get(&self, name: &str) -> Option<&str> {
         match name {
-            "play_pause" => Some(&self.play_pause),
-            "next" => Some(&self.next),
-            "prev" => Some(&self.prev),
             "toggle_popup" => Some(&self.toggle_popup),
             _ => None,
         }
@@ -27,9 +21,6 @@ impl Shortcuts {
 
     pub fn set(&mut self, name: &str, value: String) {
         match name {
-            "play_pause" => self.play_pause = value,
-            "next" => self.next = value,
-            "prev" => self.prev = value,
             "toggle_popup" => self.toggle_popup = value,
             _ => {}
         }
@@ -39,9 +30,6 @@ impl Shortcuts {
 impl Default for Shortcuts {
     fn default() -> Self {
         Self {
-            play_pause: "CmdOrCtrl+Alt+P".into(),
-            next: "CmdOrCtrl+Alt+Right".into(),
-            prev: "CmdOrCtrl+Alt+Left".into(),
             toggle_popup: "CmdOrCtrl+Alt+M".into(),
         }
     }

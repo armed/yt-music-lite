@@ -493,9 +493,6 @@ fn bind_shortcut(app: &AppHandle, name: &'static str, accelerator: &str) -> Resu
                 return;
             }
             match name {
-                "play_pause" => run_action(app, "playPause", None),
-                "next" => run_action(app, "next", None),
-                "prev" => run_action(app, "prev", None),
                 "toggle_popup" => toggle_popup(app, None),
                 _ => {}
             }
