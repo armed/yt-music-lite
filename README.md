@@ -24,6 +24,7 @@ cargo tauri build --bundles app
 ```
 
 The app is written to `target/release/bundle/macos/YT Music Lite.app` (about 4 MB).
+`just install` builds it and copies it to `/Applications`.
 For development, use `cargo run`.
 
 Sign in to your Google account once from the main window.
