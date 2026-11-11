@@ -11,11 +11,11 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Emitter, Manager, Rect, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Manager, Rect, WebviewUrl, WebviewWindowBuilder,
     WindowEvent,
 };
 #[cfg(target_os = "macos")]
-use tauri::TitleBarStyle;
+use tauri::{ActivationPolicy, TitleBarStyle};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_window_state::StateFlags;
 
@@ -54,6 +54,7 @@ Commands:
   play-pause        Toggle playback
   next              Skip to the next track
   prev              Go to the previous track
+  toggle            Show or hide the mini player
 
 Options:
   -h, --help        Print this help
@@ -63,6 +64,7 @@ If the app is running, the command is sent to it. Otherwise the app is started
 and the action is applied once a track has loaded.";
 
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
+const TOGGLE_POPUP: &str = "togglePopup";
 const COLD_START_FLAG: &str = "--cold-start";
 const IDENTIFIER: &str = "dev.armed.ytm-lite";
 
@@ -140,6 +142,7 @@ fn action_from_args(args: &[String]) -> Option<&'static str> {
         "play-pause" => Some("playPause"),
         "next" => Some("next"),
         "prev" => Some("prev"),
+        "toggle" => Some(TOGGLE_POPUP),
         _ => None,
     })
 }
@@ -246,6 +249,10 @@ fn show_main(app: AppHandle) {
 }
 
 fn run_action(app: &AppHandle, action: &str, value: Option<f64>) {
+    if action == TOGGLE_POPUP {
+        toggle_popup(app, None);
+        return;
+    }
     if !ACTIONS.contains(&action) {
         return;
     }
@@ -329,7 +336,13 @@ fn toggle_popup(app: &AppHandle, tray_rect: Option<Rect>) {
             rect.size.to_physical::<f64>(scale),
         ),
         None => {
-            let Ok(Some(monitor)) = app.primary_monitor() else {
+            // Wayland has no primary monitor.
+            let Some(monitor) = app
+                .primary_monitor()
+                .ok()
+                .flatten()
+                .or_else(|| app.available_monitors().ok()?.into_iter().next())
+            else {
                 return;
             };
             let origin = monitor.position();
@@ -378,6 +391,7 @@ fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
 
 fn build_popup_window(app: &tauri::App) -> tauri::Result<()> {
     WebviewWindowBuilder::new(app, "popup", WebviewUrl::App("index.html".into()))
+        .title("YT Music Popup")
         .inner_size(POPUP_SIZE.0, POPUP_SIZE.1)
         .decorations(false)
         .transparent(true)
@@ -414,8 +428,12 @@ fn open_settings(app: &AppHandle) {
 }
 
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let menu = MenuBuilder::new(app)
-        .item(&MenuItem::with_id(app, "open", "Open YT Music", true, None::<&str>)?)
+    let builder = MenuBuilder::new(app)
+        .item(&MenuItem::with_id(app, "open", "Open YT Music", true, None::<&str>)?);
+    // Linux trays do not report clicks, so the popup needs a menu entry there.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.item(&MenuItem::with_id(app, "popup", "Mini player", true, None::<&str>)?);
+    let menu = builder
         .item(&MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?)
         .separator()
         .item(&MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?)
@@ -428,6 +446,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "open" => open_main(app),
+            "popup" => toggle_popup(app, None),
             "quit" => app.exit(0),
             "settings" => open_settings(app),
             _ => {}

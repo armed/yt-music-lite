@@ -3,7 +3,7 @@
 A minimal desktop wrapper around [music.youtube.com](https://music.youtube.com), built with Tauri 2.
 It lives in the tray and does nothing else: no auto-updater, no telemetry, no integrations.
 
-Developed and tested on macOS only.
+Developed and tested on macOS. On Linux (Wayland) the tray, `toggle`, the floating popup and page load were tried in Sway and Hyprland 0.57 on aarch64 Fedora VMs; audio and sign-in are untested, see [Linux](#linux).
 
 ## Features
 
@@ -50,8 +50,55 @@ The settings window edits this file; the shortcut applies immediately. It uses t
 ytm-lite play-pause
 ytm-lite next
 ytm-lite prev
+ytm-lite toggle   # show/hide the mini player
 ```
 
 Enable "Command line tool" in the settings window to link `ytm-lite` into `~/.local/bin`
 (make sure it is on your `PATH`). If the app is running, the command is sent to it and the process exits immediately. Otherwise the
 app is started and the action is applied once a track has loaded.
+
+## Linux
+
+Build with `cargo tauri build --bundles deb,rpm` or just `cargo build --release`.
+Needs WebKitGTK 4.1 and libayatana-appindicator (or libappindicator-gtk3) at build time,
+and the GStreamer `good`, `bad` and `libav` plugins at run time for audio playback
+(on Fedora the AAC codecs come from RPM Fusion).
+The data directory is `$XDG_CONFIG_HOME/dev.armed.ytm-lite` (default `~/.config`).
+
+The tray icon does not report clicks on Linux, so the mini player is opened from the
+tray menu ("Mini player") or with `ytm-lite toggle`. Global shortcuts do not work on
+Wayland: bind the commands in your compositor instead. The tray needs a bar that
+hosts StatusNotifier icons (waybar `tray` module, KDE, GNOME with the AppIndicator extension).
+
+The compositor decides where the mini player goes, so make it floating. Sway:
+
+```
+bindsym $mod+m exec ytm-lite toggle
+bindsym XF86AudioPlay exec ytm-lite play-pause
+bindsym XF86AudioNext exec ytm-lite next
+bindsym XF86AudioPrev exec ytm-lite prev
+for_window [title="YT Music Popup"] floating enable, sticky enable, move position 1400 40
+```
+
+Hyprland 0.57 and newer read a Lua config, `~/.config/hypr/hyprland.lua`:
+
+```lua
+hl.bind("SUPER + P", hl.dsp.exec_cmd("ytm-lite toggle"))
+hl.window_rule({
+    name  = "ytm-popup",
+    match = { title = "^(YT Music Popup)$" },
+    float = true,
+    pin   = true,
+    move  = "100 40",
+})
+hl.on("hyprland.start", function ()
+  hl.exec_cmd("waybar")
+  hl.exec_cmd("ytm-lite")
+end)
+```
+
+The rule and the autostart were run on Hyprland 0.57.2; the key binding follows the form in the generated
+default config. The syntax differs on older Hyprland versions, check its wiki for yours.
+
+If the mini player draws as an empty transparent box, WebKitGTK cannot create a GL context
+(seen in a VM with virgl). Start the app with `WEBKIT_DISABLE_COMPOSITING_MODE=1`.
