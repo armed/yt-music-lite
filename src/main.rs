@@ -385,8 +385,32 @@ fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
         .user_agent(SAFARI_UA)
         .title_bar_style(TitleBarStyle::Overlay)
         .hidden_title(true);
-    builder.build()?;
+    let main = builder.build()?;
+    #[cfg(target_os = "macos")]
+    main.with_webview(|webview| disable_tracking_prevention(webview.inner()))?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = main;
     Ok(())
+}
+
+// Google rotates the YouTube session cookies through cross-site requests to
+// accounts.google.com, which WebKit's tracking prevention blocks, so the
+// session silently expires until a top-level sign-in refreshes it.
+#[cfg(target_os = "macos")]
+fn disable_tracking_prevention(webview: *mut std::ffi::c_void) {
+    use objc2::{msg_send, runtime::AnyObject, sel};
+    let Some(webview) = (unsafe { (webview as *mut AnyObject).as_ref() }) else {
+        return;
+    };
+    unsafe {
+        let config: &AnyObject = msg_send![webview, configuration];
+        let store: &AnyObject = msg_send![config, websiteDataStore];
+        let setter = sel!(_setResourceLoadStatisticsEnabled:);
+        let supported: bool = msg_send![store, respondsToSelector: setter];
+        if supported {
+            let _: () = msg_send![store, _setResourceLoadStatisticsEnabled: false];
+        }
+    }
 }
 
 fn build_popup_window(app: &tauri::App) -> tauri::Result<()> {

@@ -113,10 +113,33 @@
     };
   };
 
+  const SESSION_PROMPT_COOLDOWN_MS = 60_000;
+  let sessionPromptAt = 0;
+  const surfaceSessionProblem = () => {
+    if (!document.hidden || Date.now() - sessionPromptAt < SESSION_PROMPT_COOLDOWN_MS) return;
+    sessionPromptAt = Date.now();
+    window.__TAURI_INTERNALS__?.invoke("show_main").catch(() => {});
+  };
+
+  const nativeFetch = window.fetch;
+  window.fetch = async (...args) => {
+    const response = await nativeFetch.apply(window, args);
+    if (response.status === 401 && response.url.includes("/youtubei/")) surfaceSessionProblem();
+    return response;
+  };
+
+  const signInDialogOpen = () =>
+    [...document.querySelectorAll("tp-yt-paper-dialog")].some(
+      (dialog) =>
+        dialog.offsetParent !== null &&
+        dialog.querySelector('a[href*="accounts.google.com"], a[href*="ServiceLogin"]'),
+    );
+
   let last = "";
   setInterval(() => {
     const invoke = window.__TAURI_INTERNALS__?.invoke;
     if (!invoke) return;
+    if (signInDialogOpen()) surfaceSessionProblem();
     const state = snapshot();
     const json = JSON.stringify(state);
     if (json === last) return;
