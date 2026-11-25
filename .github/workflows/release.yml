@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  on-master:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag must point to a commit on master
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/master
+
+  build:
+    needs: on-master
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libxdo-dev libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Without the tauri CLI this feature is what embeds dist/ instead of expecting a dev server.
+      - run: cargo build --release --features tauri/custom-protocol
+      - run: tar -C target/release -czf "ytm-lite-linux-${{ matrix.arch }}.tar.gz" ytm-lite
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ytm-lite-linux-${{ matrix.arch }}
+          path: ytm-lite-linux-${{ matrix.arch }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" *.tar.gz --repo "$GITHUB_REPOSITORY" --generate-notes
