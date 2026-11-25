@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cli;
+mod popup;
 mod settings;
 
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
@@ -27,8 +28,6 @@ const SAFARI_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWe
 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 #[cfg(target_os = "macos")]
 const DATA_STORE_ID: [u8; 16] = *b"ytm-lite-store01";
-const POPUP_SIZE: (f64, f64) = (480.0, 200.0);
-const POPUP_GAP: f64 = 6.0;
 const SETTINGS_SIZE: (f64, f64) = (460.0, 330.0);
 const BLUR_TOGGLE_GUARD: Duration = Duration::from_millis(250);
 const ACTIONS: &[&str] = &[
@@ -161,7 +160,7 @@ fn report_state(app: AppHandle, state: Value) {
             run_action(&app, if action == "playPause" { "play" } else { action }, None);
         }
     }
-    let _ = app.emit_to("popup", "player-state", state);
+    let _ = app.emit_to(popup::LABEL, "player-state", state);
 }
 
 #[tauri::command]
@@ -265,7 +264,7 @@ fn run_action(app: &AppHandle, action: &str, value: Option<f64>) {
 }
 
 fn open_main(app: &AppHandle) {
-    hide_popup(app);
+    popup::hide(app);
     let Some(main) = app.get_webview_window("main") else {
         return;
     };
@@ -294,14 +293,8 @@ fn hide_main(app: &AppHandle) {
     let _ = app.set_activation_policy(ActivationPolicy::Accessory);
 }
 
-fn hide_popup(app: &AppHandle) {
-    if let Some(popup) = app.get_webview_window("popup") {
-        let _ = popup.hide();
-    }
-}
-
 fn toggle_popup(app: &AppHandle, tray_rect: Option<Rect>) {
-    let Some(popup) = app.get_webview_window("popup") else {
+    let Some(popup) = app.get_webview_window(popup::LABEL) else {
         return;
     };
     let state = app.state::<AppState>();
@@ -313,7 +306,7 @@ fn toggle_popup(app: &AppHandle, tray_rect: Option<Rect>) {
         None => state.tray_rect.lock().unwrap().clone(),
     };
     if popup.is_visible().unwrap_or(false) {
-        let _ = popup.hide();
+        popup::hide(app);
         return;
     }
     let recently_blurred = app
@@ -326,45 +319,7 @@ fn toggle_popup(app: &AppHandle, tray_rect: Option<Rect>) {
         return;
     }
 
-    let scale = popup.scale_factor().unwrap_or(1.0);
-    let width = POPUP_SIZE.0 * scale;
-    // Before the tray icon has ever been clicked its position is unknown, so
-    // fall back to the top-right corner under the menu bar.
-    let (pos, size) = match tray_rect {
-        Some(rect) => (
-            rect.position.to_physical::<f64>(scale),
-            rect.size.to_physical::<f64>(scale),
-        ),
-        None => {
-            // Wayland has no primary monitor.
-            let Some(monitor) = app
-                .primary_monitor()
-                .ok()
-                .flatten()
-                .or_else(|| app.available_monitors().ok()?.into_iter().next())
-            else {
-                return;
-            };
-            let origin = monitor.position();
-            let right = origin.x as f64 + monitor.size().width as f64;
-            (
-                tauri::PhysicalPosition::new(right - width / 2.0 - 16.0 * scale, origin.y as f64),
-                tauri::PhysicalSize::new(0.0, 24.0 * scale),
-            )
-        }
-    };
-    let mut x = pos.x + size.width / 2.0 - width / 2.0;
-    let y = pos.y + size.height + POPUP_GAP * scale;
-
-    if let Ok(Some(monitor)) = popup.monitor_from_point(pos.x, pos.y) {
-        let left = monitor.position().x as f64;
-        let right = left + monitor.size().width as f64;
-        x = x.clamp(left + 8.0 * scale, right - width - 8.0 * scale);
-    }
-
-    let _ = popup.set_position(tauri::PhysicalPosition::new(x, y));
-    let _ = popup.show();
-    let _ = popup.set_focus();
+    popup::show(app, &popup, tray_rect);
 }
 
 fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
@@ -413,22 +368,6 @@ fn disable_tracking_prevention(webview: *mut std::ffi::c_void) {
     }
 }
 
-fn build_popup_window(app: &tauri::App) -> tauri::Result<()> {
-    WebviewWindowBuilder::new(app, "popup", WebviewUrl::App("index.html".into()))
-        .title("YT Music Popup")
-        .inner_size(POPUP_SIZE.0, POPUP_SIZE.1)
-        .decorations(false)
-        .transparent(true)
-        .shadow(true)
-        .resizable(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .visible_on_all_workspaces(true)
-        .visible(false)
-        .build()?;
-    Ok(())
-}
-
 fn build_settings_window(app: &tauri::App) -> tauri::Result<()> {
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .title("YT Music Lite Settings")
@@ -443,7 +382,7 @@ fn build_settings_window(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn open_settings(app: &AppHandle) {
-    hide_popup(app);
+    popup::hide(app);
     let Some(window) = app.get_webview_window("settings") else {
         return;
     };
@@ -608,7 +547,7 @@ fn main() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
-                .with_denylist(&["popup", "settings"])
+                .with_denylist(&[popup::LABEL, "settings"])
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
@@ -634,10 +573,11 @@ fn main() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            ("popup", WindowEvent::Focused(false)) => {
+            (popup::LABEL, WindowEvent::Moved(position)) => popup::moved(window.app_handle(), *position),
+            (popup::LABEL, WindowEvent::Focused(false)) => {
                 let app = window.app_handle();
                 *app.state::<AppState>().popup_hidden_at.lock().unwrap() = Some(Instant::now());
-                hide_popup(app);
+                popup::hide(app);
             }
             _ => {}
         })
@@ -666,7 +606,7 @@ fn main() {
             app.set_activation_policy(ActivationPolicy::Accessory);
 
             build_main_window(app)?;
-            build_popup_window(app)?;
+            popup::build(app)?;
             build_settings_window(app)?;
             build_tray(app)?;
             spawn_loading_indicator(app.handle().clone());

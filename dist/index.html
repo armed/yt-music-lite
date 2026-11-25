@@ -85,6 +85,10 @@
   for (const [id, a] of [["like","like"],["prev","prev"],["play","playPause"],["next","next"],["dislike","dislike"],["mute","toggleMute"],["shuffle","toggleShuffle"],["repeat","toggleRepeat"]])
     $(id).onclick = () => act(a);
   $("open").onclick = () => invoke("show_main");
+  document.querySelector(".card").onmousedown = (e) => {
+    if (e.button === 0 && !e.target.closest("button, .track"))
+      window.__TAURI__.window.getCurrentWindow().startDragging();
+  };
   $("track").onclick = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     if (duration) act("seek", (e.clientX - r.left) / r.width);

@@ -3,6 +3,7 @@
   "windows": ["popup"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
     "allow-get-state",
     "allow-player-action",
     "allow-show-main"

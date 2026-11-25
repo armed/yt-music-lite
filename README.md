@@ -9,6 +9,7 @@ Developed and tested on macOS. On Linux (Wayland) the tray, `toggle`, the floati
 
 - Starts hidden in the tray; closing the window hides it instead of quitting.
 - Tray popup (left click) with cover, title, artist, seek bar and playback controls.
+  Drag it by any empty spot to move it; it opens there from then on.
 - Tray menu (right click): open the window, settings, quit.
 - Settings window for start-in-tray and the global shortcut.
 - Global hotkeys for play/pause, next, previous and showing/hiding the popup.
@@ -70,7 +71,11 @@ tray menu ("Mini player") or with `ytm-lite toggle`. Global shortcuts do not wor
 Wayland: bind the commands in your compositor instead. The tray needs a bar that
 hosts StatusNotifier icons (waybar `tray` module, KDE, GNOME with the AppIndicator extension).
 
-The compositor decides where the mini player goes, so make it floating. Sway:
+On Wayland the compositor decides where the mini player goes. On KDE Plasma the app adds a KWin
+window rule "YT Music Popup" on first start: bottom-right corner, kept above, hidden from the taskbar
+and the window switcher, and KWin remembers where it was dragged to. Change it in System Settings →
+Window Management → Window Rules; the app does not touch it once it exists. Other compositors need
+a rule that makes it floating. Sway:
 
 ```
 bindsym $mod+m exec ytm-lite toggle
