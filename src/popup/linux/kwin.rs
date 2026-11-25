@@ -42,11 +42,17 @@ pub fn ensure_popup_rule(app: &AppHandle, title: &str, popup_size: (f64, f64)) {
         }
     }
 
-    let rules = read("General", "rules").unwrap_or_default();
-    let mut ids: Vec<&str> = rules.split(',').filter(|id| !id.is_empty()).collect();
+    // Older KWin lists rules in "rules" and "count", Plasma 6 rewrites them to "Order".
+    let rules = read("General", "Order")
+        .filter(|ids| !ids.is_empty())
+        .or_else(|| read("General", "rules"))
+        .unwrap_or_default();
+    let mut ids: Vec<&str> = rules.split(',').filter(|id| !id.is_empty() && *id != RULE_ID).collect();
     ids.push(RULE_ID);
-    let _ = write("General", "rules", &ids.join(","));
-    let _ = write("General", "count", &ids.len().to_string());
+    let ids = ids.join(",");
+    let _ = write("General", "Order", &ids);
+    let _ = write("General", "rules", &ids);
+    let _ = write("General", "count", &ids.split(',').count().to_string());
 
     let _ = Command::new("gdbus")
         .args(["call", "--session", "--dest", "org.kde.KWin", "--object-path", "/KWin"])
@@ -60,7 +66,7 @@ fn is_kde_wayland() -> bool {
 }
 
 fn rule_exists() -> bool {
-    read("General", "rules").is_some_and(|rules| rules.split(',').any(|id| id == RULE_ID))
+    read(RULE_ID, "title").is_some_and(|title| !title.is_empty())
 }
 
 fn bottom_right(app: &AppHandle, (width, height): (f64, f64)) -> Option<String> {
