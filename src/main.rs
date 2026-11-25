@@ -2,6 +2,7 @@
 
 mod cli;
 mod popup;
+mod tray;
 mod settings;
 
 use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
@@ -9,9 +10,6 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tauri::{
-    image::Image,
-    menu::{MenuBuilder, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Rect, WebviewUrl, WebviewWindowBuilder,
     WindowEvent,
 };
@@ -62,7 +60,6 @@ Options:
 If the app is running, the command is sent to it. Otherwise the app is started
 and the action is applied once a track has loaded.";
 
-const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.png");
 const TOGGLE_POPUP: &str = "togglePopup";
 const COLD_START_FLAG: &str = "--cold-start";
 const IDENTIFIER: &str = "dev.armed.ytm-lite";
@@ -390,45 +387,6 @@ fn open_settings(app: &AppHandle) {
     let _ = window.set_focus();
 }
 
-fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let builder = MenuBuilder::new(app)
-        .item(&MenuItem::with_id(app, "open", "Open YT Music", true, None::<&str>)?);
-    // Linux trays do not report clicks, so the popup needs a menu entry there.
-    #[cfg(not(target_os = "macos"))]
-    let builder = builder.item(&MenuItem::with_id(app, "popup", "Mini player", true, None::<&str>)?);
-    let menu = builder
-        .item(&MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?)
-        .separator()
-        .item(&MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?)
-        .build()?;
-
-    TrayIconBuilder::with_id("tray")
-        .icon(Image::from_bytes(TRAY_ICON)?)
-        .tooltip("YT Music")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(move |app, event| match event.id().as_ref() {
-            "open" => open_main(app),
-            "popup" => toggle_popup(app, None),
-            "quit" => app.exit(0),
-            "settings" => open_settings(app),
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                rect,
-                ..
-            } = event
-            {
-                toggle_popup(tray.app_handle(), Some(rect));
-            }
-        })
-        .build(app)?;
-    Ok(())
-}
-
 fn spawn_loading_indicator(app: AppHandle) {
     const FRAMES: [&[u8]; 6] = [
         include_bytes!("../icons/tray-loading-0.png"),
@@ -444,24 +402,15 @@ fn spawn_loading_indicator(app: AppHandle) {
         let mut frame = 0;
         loop {
             let state = app.state::<AppState>();
-            let Some(tray) = app.tray_by_id("tray") else {
-                return;
-            };
             let seen = state.track_seen.load(Ordering::Relaxed);
             if seen || started.elapsed() > GIVE_UP_AFTER {
                 if !seen {
                     *state.pending_action.lock().unwrap() = None;
                 }
-                if let Ok(icon) = Image::from_bytes(TRAY_ICON) {
-                    let _ = tray.set_icon(Some(icon));
-                }
-                let _ = tray.set_tooltip(Some("YT Music"));
+                tray::set_icon(&app, tray::ICON, tray::TOOLTIP);
                 return;
             }
-            if let Ok(icon) = Image::from_bytes(FRAMES[frame % FRAMES.len()]) {
-                let _ = tray.set_icon(Some(icon));
-            }
-            let _ = tray.set_tooltip(Some("YT Music — loading…"));
+            tray::set_icon(&app, FRAMES[frame % FRAMES.len()], "YT Music — loading…");
             frame += 1;
             std::thread::sleep(Duration::from_millis(150));
         }
@@ -608,7 +557,7 @@ fn main() {
             build_main_window(app)?;
             popup::build(app)?;
             build_settings_window(app)?;
-            build_tray(app)?;
+            tray::build(app)?;
             spawn_loading_indicator(app.handle().clone());
 
             if !start_hidden {

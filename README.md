@@ -61,15 +61,16 @@ app is started and the action is applied once a track has loaded.
 ## Linux
 
 Build with `cargo tauri build --bundles deb,rpm` or just `cargo build --release`.
-Needs WebKitGTK 4.1 and libayatana-appindicator (or libappindicator-gtk3) at build time,
+Needs WebKitGTK 4.1 at build time,
 and the GStreamer `good`, `bad` and `libav` plugins at run time for audio playback
 (on Fedora the AAC codecs come from RPM Fusion).
 The data directory is `$XDG_CONFIG_HOME/dev.armed.ytm-lite` (default `~/.config`).
 
-The tray icon does not report clicks on Linux, so the mini player is opened from the
-tray menu ("Mini player") or with `ytm-lite toggle`. Global shortcuts do not work on
-Wayland: bind the commands in your compositor instead. The tray needs a bar that
-hosts StatusNotifier icons (waybar `tray` module, KDE, GNOME with the AppIndicator extension).
+The tray icon is a StatusNotifierItem served by the app itself: left click toggles the mini player,
+right click opens the menu. The menu also has "Mini player" for hosts that do not send clicks, and
+`ytm-lite toggle` works too. Global shortcuts do not work on Wayland: bind the commands in your
+compositor instead. The tray needs a bar that hosts StatusNotifier icons (waybar `tray` module,
+KDE, GNOME with the AppIndicator extension).
 
 On Wayland the compositor decides where the mini player goes. On KDE Plasma the app adds a KWin
 window rule "YT Music Popup" on first start: bottom-right corner, kept above, hidden from the taskbar
